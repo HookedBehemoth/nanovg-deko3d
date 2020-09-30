@@ -194,6 +194,7 @@ namespace nvg {
             DkRenderer(unsigned int view_width, unsigned int view_height, dk::Device device, dk::Queue queue, CMemPool &image_mem_pool, CMemPool &code_mem_pool, CMemPool &data_mem_pool);
             ~DkRenderer();
 
+            void UpdateViewBounds(unsigned int view_width, unsigned int view_height);
             int Create(DKNVGcontext &ctx);
             int CreateTexture(const DKNVGcontext &ctx, int type, int w, int h, int image_flags, const u8 *data);
             int DeleteTexture(const DKNVGcontext &ctx, int id);

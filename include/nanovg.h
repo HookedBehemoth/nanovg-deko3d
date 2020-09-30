@@ -23,6 +23,16 @@
 extern "C" {
 #endif
 
+/// Flags a function as (always) inline.
+#define NVG_INLINE __attribute__((always_inline)) static inline
+
+/// Flags a function as constexpr in C++14 and above; or as (always) inline otherwise.
+#if __cplusplus >= 201402L
+#define NVG_CONSTEXPR NVG_INLINE constexpr
+#else
+#define NVG_CONSTEXPR NVG_INLINE
+#endif
+
 #define NVG_PI 3.14159265358979323846264338327f
 
 #ifdef _MSC_VER
@@ -181,28 +191,60 @@ void nvgGlobalCompositeBlendFuncSeparate(NVGcontext* ctx, int srcRGB, int dstRGB
 //
 // Colors in NanoVG are stored as unsigned ints in ABGR format.
 
+// Returns a color value from red, green, blue and alpha values.
+NVG_CONSTEXPR NVGcolor nvgRGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+{
+	NVGcolor color;
+	// Use longer initialization to suppress warning.
+	color.r = r / 255.0f;
+	color.g = g / 255.0f;
+	color.b = b / 255.0f;
+	color.a = a / 255.0f;
+	return color;
+}
+
+// Returns a color value from red, green, blue and alpha values.
+NVG_CONSTEXPR NVGcolor nvgRGBAf(float r, float g, float b, float a)
+{
+	NVGcolor color;
+	// Use longer initialization to suppress warning.
+	color.r = r;
+	color.g = g;
+	color.b = b;
+	color.a = a;
+	return color;
+}
+
+
 // Returns a color value from red, green, blue values. Alpha will be set to 255 (1.0f).
-NVGcolor nvgRGB(unsigned char r, unsigned char g, unsigned char b);
+NVG_CONSTEXPR NVGcolor nvgRGB(unsigned char r, unsigned char g, unsigned char b)
+{
+	return nvgRGBA(r,g,b,255);
+}
 
 // Returns a color value from red, green, blue values. Alpha will be set to 1.0f.
-NVGcolor nvgRGBf(float r, float g, float b);
-
-
-// Returns a color value from red, green, blue and alpha values.
-NVGcolor nvgRGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
-
-// Returns a color value from red, green, blue and alpha values.
-NVGcolor nvgRGBAf(float r, float g, float b, float a);
+NVG_CONSTEXPR NVGcolor nvgRGBf(float r, float g, float b)
+{
+	return nvgRGBAf(r,g,b,1.0f);
+}
 
 
 // Linearly interpolates from color c0 to c1, and returns resulting color value.
 NVGcolor nvgLerpRGBA(NVGcolor c0, NVGcolor c1, float u);
 
 // Sets transparency of a color value.
-NVGcolor nvgTransRGBA(NVGcolor c0, unsigned char a);
+NVG_CONSTEXPR NVGcolor nvgTransRGBA(NVGcolor c, unsigned char a)
+{
+	c.a = a / 255.0f;
+	return c;
+}
 
 // Sets transparency of a color value.
-NVGcolor nvgTransRGBAf(NVGcolor c0, float a);
+NVG_CONSTEXPR NVGcolor nvgTransRGBAf(NVGcolor c, float a)
+{
+	c.a = a;
+	return c;
+}
 
 // Returns color value specified by hue, saturation and lightness.
 // HSL values are all in range [0..1], alpha will be set to 255.
@@ -373,7 +415,7 @@ int nvgCreateImage(NVGcontext* ctx, const char* filename, int imageFlags);
 
 // Creates image by loading it from the specified chunk of memory.
 // Returns handle to the image.
-int nvgCreateImageMem(NVGcontext* ctx, int imageFlags, unsigned char* data, int ndata);
+int nvgCreateImageMem(NVGcontext* ctx, int imageFlags, const unsigned char* data, int ndata);
 
 // Creates image from specified image data.
 // Returns handle to the image.
