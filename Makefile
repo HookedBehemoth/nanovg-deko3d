@@ -11,60 +11,39 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
-# BUILD is the directory where object files & intermediate files will be placed
 # SOURCES is a list of directories containing source code
 # DATA is a list of directories containing data files
 # INCLUDES is a list of directories containing header files
-# ROMFS is the directory containing data to be added to RomFS, relative to the Makefile (Optional)
-#
-# NO_ICON: if set to anything, do not use icon.
-# NO_NACP: if set to anything, no .nacp file is generated.
-# APP_TITLE is the name of the app stored in the .nacp file (Optional)
-# APP_AUTHOR is the author of the app stored in the .nacp file (Optional)
-# APP_VERSION is the version of the app stored in the .nacp file (Optional)
-# APP_TITLEID is the titleID of the app stored in the .nacp file (Optional)
-# ICON is the filename of the icon (.jpg), relative to the project folder.
-#   If not set, it attempts to use one of the following (in this order):
-#     - <Project name>.jpg
-#     - icon.jpg
-#     - <libnx folder>/default_icon.jpg
-#
-# CONFIG_JSON is the filename of the NPDM config file (.json), relative to the project folder.
-#   If not set, it attempts to use one of the following (in this order):
-#     - <Project name>.json
-#     - config.json
-#   If a JSON file is provided or autodetected, an ExeFS PFS0 (.nsp) is built instead
-#   of a homebrew executable (.nro). This is intended to be used for sysmodules.
-#   NACP building is skipped as well.
 #---------------------------------------------------------------------------------
-TARGET		:=	libnanovg
+TARGET		:=	nanovg
 BUILD		:=	build
-SOURCES		:=	source source/framework
-INCLUDES	:=	include include/nanovg include/nanovg/framework
+SOURCES		:=	source source/nx source/nx/framework
+DATA		:=	data
+INCLUDES	:=	include
+SHADERS		:=	shaders
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
+ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
 
-CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
-			$(ARCH) $(DEFINES)
+CFLAGS	:=	-g -Wall \
+			-ffunction-sections \
+			-fdata-sections \
+			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__
+CFLAGS	+=	$(INCLUDE) -DNDEBUG=1 -D__SWITCH__ -O2
 
-CXXFLAGS	:= $(CFLAGS) -std=gnu++17 -fno-exceptions -fno-rtti
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-
-#LIBS	:= -ldeko3dd -lglad -lEGL -lglapi -ldrm_nouveau
-LIBS	:= -ldeko3d
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(PORTLIBS) $(LIBNX)
+
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
@@ -77,14 +56,15 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 export TOPDIR	:=	$(CURDIR)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+					$(foreach dir,$(SHADERS),$(CURDIR)/$(dir)) \
+					$(foreach dir,$(DATA),$(CURDIR)/$(dir))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-GLSLFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.glsl)))
+GLSLFILES	:=	$(foreach dir,$(SHADERS),$(notdir $(wildcard $(dir)/*.glsl)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
 #---------------------------------------------------------------------------------
@@ -104,41 +84,74 @@ endif
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
 export OFILES_SRC	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 export OFILES 	:=	$(OFILES_BIN) $(OFILES_SRC)
-export HFILES_BIN	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
+export HFILES	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
+
+ifneq ($(strip $(DATA)),)
+	DATA_SHADERS := $(DATA)
+	DATA_TARGETS := $(patsubst %.glsl, $(DATA_SHADERS)/%.dksh, $(GLSLFILES))
+	DATA_FOLDERS := $(DATA_SHADERS)
+
+	export DATA_DEPS := $(foreach file,$(DATA_TARGETS),$(CURDIR)/$(file))
+endif
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)/$(BUILD)
 
-.PHONY: all clean
+.PHONY: clean all
 
 #---------------------------------------------------------------------------------
-all: lib/$(TARGET).a
+all: $(DATA_TARGETS) lib/lib$(TARGET).a
 
 lib:
 	@[ -d $@ ] || mkdir -p $@
 
-release:
+build:
 	@[ -d $@ ] || mkdir -p $@
 
-lib/$(TARGET).a : lib release $(SOURCES) $(INCLUDES)
-	@$(MAKE) BUILD=release OUTPUT=$(CURDIR)/$@ \
-	BUILD_CFLAGS="-DNDEBUG=1 -O2" \
-	DEPSDIR=$(CURDIR)/release \
-	--no-print-directory -C release \
-	-f $(CURDIR)/Makefile
+lib/lib$(TARGET).a : lib build $(DATA_TARGETS)
+	@$(MAKE) --no-print-directory OUTPUT=$(CURDIR)/$@ -C $(BUILD) -f $(CURDIR)/Makefile
 
-dist-bin: all
-	@tar --exclude=*~ -cjf $(TARGET).tar.bz2 include lib
+#---------------------------------------------------------------------------------
 
-dist-src:
-	@tar --exclude=*~ -cjf $(TARGET)-src.tar.bz2 include source Makefile
+ifneq ($(strip $(DATA_TARGETS)),)
 
-dist: dist-src dist-bin
+$(DATA_TARGETS): | $(DATA_FOLDERS)
+
+$(DATA_FOLDERS):
+	@mkdir -p $@
+
+$(DATA_SHADERS)/%_vsh.dksh: %_vsh.glsl
+	@echo {vert} $(notdir $<)
+	@uam -s vert -o $@ $<
+
+$(DATA_SHADERS)/%_tcsh.dksh: %_tcsh.glsl
+	@echo {tess_ctrl} $(notdir $<)
+	@uam -s tess_ctrl -o $@ $<
+
+$(DATA_SHADERS)/%_tesh.dksh: %_tesh.glsl
+	@echo {tess_eval} $(notdir $<)
+	@uam -s tess_eval -o $@ $<
+
+$(DATA_SHADERS)/%_gsh.dksh: %_gsh.glsl
+	@echo {geom} $(notdir $<)
+	@uam -s geom -o $@ $<
+
+$(DATA_SHADERS)/%_fsh.dksh: %_fsh.glsl
+	@echo {frag} $(notdir $<)
+	@uam -s frag -o $@ $<
+
+$(DATA_SHADERS)/%.dksh: %.glsl
+	@echo {comp} $(notdir $<)
+	@uam -s comp -o $@ $<
+
+endif
+
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr release lib *.bz2
+	@rm -fr build lib
+
 #---------------------------------------------------------------------------------
 else
 
@@ -147,16 +160,15 @@ DEPENDS	:=	$(OFILES:.o=.d)
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-$(OUTPUT)	:	$(OFILES)
+$(OUTPUT)	:	$(DATA_DEPS) $(OFILES)
 
-$(OFILES)	:	$(GCH_FILES)
-
-$(OFILES_SRC)	: $(HFILES_BIN)
+$(OFILES_SRC)	: $(HFILES)
 
 #---------------------------------------------------------------------------------
 # you need a rule like this for each extension you use as binary data
 #---------------------------------------------------------------------------------
-%.bin.o	%_bin.h :	%.bin
+%.bin.o	%_bin.h		:	%.bin
+%.dksh.o %_dksh.h	:	%.dksh
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)

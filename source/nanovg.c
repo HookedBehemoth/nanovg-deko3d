@@ -418,50 +418,6 @@ void nvgEndFrame(NVGcontext* ctx)
 	}
 }
 
-NVGcolor nvgRGB(unsigned char r, unsigned char g, unsigned char b)
-{
-	return nvgRGBA(r,g,b,255);
-}
-
-NVGcolor nvgRGBf(float r, float g, float b)
-{
-	return nvgRGBAf(r,g,b,1.0f);
-}
-
-NVGcolor nvgRGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
-{
-	NVGcolor color;
-	// Use longer initialization to suppress warning.
-	color.r = r / 255.0f;
-	color.g = g / 255.0f;
-	color.b = b / 255.0f;
-	color.a = a / 255.0f;
-	return color;
-}
-
-NVGcolor nvgRGBAf(float r, float g, float b, float a)
-{
-	NVGcolor color;
-	// Use longer initialization to suppress warning.
-	color.r = r;
-	color.g = g;
-	color.b = b;
-	color.a = a;
-	return color;
-}
-
-NVGcolor nvgTransRGBA(NVGcolor c, unsigned char a)
-{
-	c.a = a / 255.0f;
-	return c;
-}
-
-NVGcolor nvgTransRGBAf(NVGcolor c, float a)
-{
-	c.a = a;
-	return c;
-}
-
 NVGcolor nvgLerpRGBA(NVGcolor c0, NVGcolor c1, float u)
 {
 	int i;
@@ -804,7 +760,7 @@ int nvgCreateImage(NVGcontext* ctx, const char* filename, int imageFlags)
 	return image;
 }
 
-int nvgCreateImageMem(NVGcontext* ctx, int imageFlags, unsigned char* data, int ndata)
+int nvgCreateImageMem(NVGcontext* ctx, int imageFlags, const unsigned char* data, int ndata)
 {
 	int w, h, n, image;
 	unsigned char* img = stbi_load_from_memory(data, ndata, &w, &h, &n, 4);

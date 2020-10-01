@@ -27,5 +27,5 @@ public:
         return &m_shader;
     }
 
-    bool load(CMemPool& pool, const char* path);
+    bool loadMem(CMemPool& pool, const u8* pointer, size_t size);
 };
