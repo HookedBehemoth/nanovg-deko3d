@@ -4,29 +4,10 @@
 #include <cstring>
 #include <deko3d.hpp>
 #include <optional>
-#include <wrapper.hpp>
+#include <nvgwrapper.hpp>
 
 #include "framework/CMemPool.h"
 #include "nanovg_dk.h"
-
-extern "C" {
-void __attribute__((weak)) nvgAppInit(void);
-void __attribute__((weak)) nvgAppExit(void);
-
-void userAppInit(void) {
-    plInitialize(PlServiceType_User);
-
-    if (&nvgAppInit)
-        nvgAppInit();
-}
-
-void userAppExit(void) {
-    plExit();
-
-    if (&nvgAppExit)
-        nvgAppExit();
-}
-}
 
 namespace nvg {
 
@@ -280,6 +261,8 @@ namespace nvg {
     }
 
     void Initialize() {
+        plInitialize(PlServiceType_User);
+
         appletHook(&s_cookie, AppletCallback, nullptr);
         s_Dk.emplace();
         running = true;
@@ -288,6 +271,8 @@ namespace nvg {
     void Exit() {
         running = false;
         s_Dk.reset();
+
+        plExit();
     }
 
     bool MainLoop() {
